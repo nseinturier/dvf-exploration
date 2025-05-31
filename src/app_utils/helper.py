@@ -69,6 +69,59 @@ def plot_evolution(
         )
     return fig
 
+def average_price_per_neighborhood(
+        df: pl.DataFrame,
+        adjacing_sections_df: pl.DataFrame
+)->pl.DataFrame:
+    return (
+        df
+        .join(adjacing_sections_df, on = "section")
+        .explode(columns="adjacing_sections")
+        .drop('section')
+        .rename({"adjacing_sections": "section"})
+    )
+
+def calculate_price_per_zone(
+        df: pl.DataFrame,
+        surface_selection: list[str],
+        year_range: list[int],
+        metric: str,
+        granularity: list[str]
+)->pl.DataFrame:
+    mapper = {
+        "Prix moyen": lambda x: pl.mean(x),
+        "Prix médian": lambda x: pl.median(x)
+    }
+
+    return (
+        df
+        .filter(
+            pl.col("surface_category").is_in(surface_selection),
+            pl.col('year').is_in(year_range),
+            pl.col('prix_m2') > 500 # remove absurd prices
+        )
+        .group_by(granularity)
+        .agg(
+            mapper[metric]('prix_m2').round(2).cast(int),
+            pl.len()
+        )
+    )
+
+def calculate_price_growth(
+        df: pl.DataFrame,
+        section_col: str
+)->pl.DataFrame:
+    return (
+        df
+        .filter(pl.col('len') >= 5)
+        .sort(section_col, "year", descending=[True, False])
+        .with_columns(
+            pl.col("prix_m2").pct_change().over(section_col).alias(f"croissance").mul(100).round(2)
+        )
+        .group_by(section_col)
+        .agg(pl.mean('croissance').alias('prix_m2'))
+        .drop_nulls()
+    )
 
 def plot_map(
         housing_metric: dict[str, float|int],
@@ -158,3 +211,5 @@ def plot_map(
         dragmode='pan'
     )
     return fig
+
+
