@@ -59,7 +59,7 @@ df_stats = df.pipe(average_price_per_neighborhood, adjacing_sections_df) if smoo
 
 granularity = ["year", "section"] if show_growth else ["section"]
 stats = calculate_price_per_zone(df_stats, surface_selection, year_range, metric, granularity)
-stats = stats.pipe(calculate_price_growth, "section") if show_growth else stats
+stats = stats.pipe(calculate_price_growth, year_range, "section") if show_growth else stats
 
 housing_prices = {dic["section"]: dic["prix_m2"] for dic in stats.to_dicts()}
 polygon_data = {k: v for k, v in polygon_data.items() if k in housing_prices.keys()}
@@ -68,6 +68,8 @@ polygon_data = {k: v for k, v in polygon_data.items() if k in housing_prices.key
 
 map = plot_map(housing_prices, polygon_data)
 st.plotly_chart(map)
+
+################################ PART 2 #######################################
 
 #TODO
 #Carte avec les sections

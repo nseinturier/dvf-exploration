@@ -97,7 +97,7 @@ def calculate_price_per_zone(
         df
         .filter(
             pl.col("surface_category").is_in(surface_selection),
-            pl.col('year').is_in(year_range),
+            pl.col('year').is_between(year_range[0], year_range[1]),
             pl.col('prix_m2') > 500 # remove absurd prices
         )
         .group_by(granularity)
@@ -109,11 +109,15 @@ def calculate_price_per_zone(
 
 def calculate_price_growth(
         df: pl.DataFrame,
+        year_range: list[int],
         section_col: str
 )->pl.DataFrame:
     return (
         df
-        .filter(pl.col('len') >= 5)
+        .filter(
+            pl.col('len') >= 5,
+            pl.col('year').is_in(year_range)
+        )
         .sort(section_col, "year", descending=[True, False])
         .with_columns(
             pl.col("prix_m2").pct_change().over(section_col).alias(f"croissance").mul(100).round(2)
