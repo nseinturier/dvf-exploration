@@ -21,7 +21,7 @@ def get_adjency_cadastre(
 
         for other_cadastre, other_polygon in polygon_data.items():
             
-            if polygon.touches(other_polygon):
+            if (polygon.touches(other_polygon)) | (polygon == other_polygon):
                 adjacing_cadastres.append(other_cadastre)
 
         all_adjacing_cadastres[cadastre] = adjacing_cadastres
