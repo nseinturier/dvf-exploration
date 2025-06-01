@@ -315,8 +315,8 @@ def map_calculate_evolution(
                 evolution_sections
                 .group_by("year", 'section_type')
                 .agg(
-                mean_price_m2 = pl.median('prix_m2').round(0).cast(int),
-                median_price_m2 = pl.mean('prix_m2').round(0).cast(int),
+                mean_price_m2 = pl.mean('prix_m2').round(0).cast(int),
+                median_price_m2 = pl.median('prix_m2').round(0).cast(int),
                 nb_transactions = pl.len()
                 )
                 .sort('section_type', 'year')
