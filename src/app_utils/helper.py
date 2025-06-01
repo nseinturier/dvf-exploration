@@ -6,6 +6,11 @@ import plotly.graph_objects as go
 import json
 from shapely.geometry.polygon import Polygon
 
+METRIC_MAPPER = {
+        "Prix moyen": lambda x: pl.mean(x),
+        "Prix médian": lambda x: pl.median(x)
+    }
+
 @st.cache_data
 def load_data():
     return pl.read_csv(config.data_dir / "cleaned" / "data_nice_cleaned.csv", try_parse_dates=True)
@@ -66,7 +71,7 @@ def plot_evolution(
     fig.update_xaxes(
         dtick=1,  # Show every 1 year
         tickmode='linear'
-        )
+    )
     return fig
 
 def average_price_per_neighborhood(
@@ -88,11 +93,6 @@ def calculate_price_per_zone(
         metric: str,
         granularity: list[str]
 )->pl.DataFrame:
-    mapper = {
-        "Prix moyen": lambda x: pl.mean(x),
-        "Prix médian": lambda x: pl.median(x)
-    }
-
     return (
         df
         .filter(
@@ -102,7 +102,7 @@ def calculate_price_per_zone(
         )
         .group_by(granularity)
         .agg(
-            mapper[metric]('prix_m2').round(2).cast(int),
+            METRIC_MAPPER[metric]('prix_m2').round(2).cast(int),
             pl.len()
         )
     )
@@ -129,7 +129,14 @@ def calculate_price_growth(
 
 def plot_map(
         housing_metric: dict[str, float|int],
-        polygon_data: dict[str, Polygon]
+        polygon_data: dict[str, Polygon],
+        lon: float = 7.2620,
+        lat: float = 43.7102,
+        height: int = 600,
+        width: int = None,
+        display_section_name: bool = False,
+        zoom: int = 12,
+        show_colorbar: bool = True
 )->go.Figure:
     price_values = list(housing_metric.values())
     min_price = min(price_values)
@@ -166,48 +173,65 @@ def plot_map(
             showlegend=False  # Hide individual traces from legend
         ))
 
-    # Add a single invisible trace for the colorbar
-    fig.add_trace(go.Scattermap(
-        lon=[7.2620],  # Nice center
-        lat=[43.7102],
-        mode='markers',
-        marker=dict(
-            size=0,  # Invisible marker
-            colorscale=color_choice,
-            cmin=min_price,
-            cmax=max_price,
-            colorbar=dict(
-                title="Housing Price (€)",
-                thickness=15,  # Thinner colorbar
-                len=0.7,       # Shorter colorbar
-                x=1.02,        # Position to the right
-                tickformat=".0f",  # No decimals
-                tickprefix="€"     # Euro symbol
-            )
-        ),
-        showlegend=False,
-        hoverinfo='skip'
-    ))
+        if display_section_name:
+            centroid = polygon.centroid
+            fig.add_trace(go.Scattermap(
+                lon=[centroid.x],
+                lat=[centroid.y],
+                mode='text',
+                text=[name],
+                textposition="middle center",
+                textfont=dict(
+                    size=12,
+                    weight="bold",
+                    color='black'  # Try bright color to see if it appears
+                ),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+    if show_colorbar:
+        fig.add_trace(go.Scattermap(
+            lon=[lon],  # Nice center
+            lat=[lat],
+            mode='markers',
+            marker=dict(
+                size=0,  # Invisible marker
+                colorscale=color_choice,
+                cmin=min_price,
+                cmax=max_price,
+                colorbar=dict(
+                    title="Housing Price (€)",
+                    thickness=15,  # Thinner colorbar
+                    len=0.7,       # Shorter colorbar
+                    x=1.02,        # Position to the right
+                    tickformat=".0f",  # No decimals
+                    tickprefix="€"     # Euro symbol
+                )
+            ),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
 
     # Configure the map with proper controls
     fig.update_layout(
         map=dict(
             style="carto-positron",
-            center=dict(lat=43.7502, lon=7.2093),
+            center=dict(lat=lat, lon=lon),
             zoom=11
         ),
         showlegend=False,  # Clean - no messy legend
-        height=600,
-        #width=800,
-        margin=dict(l=0, r=80, t=50, b=0),  # Space for colorbar
+        height=height,
+        width=width,
+        margin=dict(l=0, r=0, t=0, b=0),  # Space for colorbar
     )
 
     # Enable all map controls
     fig.update_layout(
         map=dict(
             style="carto-positron",
-            center=dict(lat=43.7102, lon=7.2620),
-            zoom=12,
+            center=dict(lat=lat, lon=lon),
+            zoom=zoom,
             bearing=0,
             pitch=0
         ),

@@ -70,11 +70,94 @@ map = plot_map(housing_prices, polygon_data)
 st.plotly_chart(map)
 
 ################################ PART 2 #######################################
+st.markdown("<br><br>", unsafe_allow_html=True)
+col1, col2 = st.columns(2)
+with col1:
+    section_choice = st.selectbox('Choose a section:', sections, index=sections.index('LC'))
+with col2:
+    adjencing_list = adjacing_sections[section_choice]
+    adjencing_polygons = {k: v for k,v in polygon_data.items() if k in adjencing_list}
+    housing_metric = {c: 1 if c != section_choice else 2 for c in adjencing_list}
+    centroid = adjencing_polygons[section_choice].centroid
+    lat = centroid.y
+    lon = centroid.x
+    fig = plot_map(
+        housing_metric, 
+        adjencing_polygons,
+        lon = lon,
+        lat = lat,
+        height=200,
+        width=300,
+        display_section_name=True,
+        zoom=11.5,
+        show_colorbar=False
+    )
+    st.plotly_chart(fig)
+
+def map_calculate_stats_sections(
+        df: pl.DataFrame,
+        year_range: list[int],
+        surface_selection: list[str],
+        section_choice: list[str],
+)->pl.DataFrame:
+    adjacing_sections_filtered = [c for c in adjacing_sections[section_choice] if c != section_choice]
+    df_filtered = (
+        df
+        .filter(
+            pl.col("surface_category").is_in(surface_selection),
+            pl.col('year').is_between(year_range[0], year_range[1]),
+            pl.col('prix_m2') > 500 # remove absurd prices
+        )
+        .with_columns(
+            pl
+            .when(pl.col('section') == section_choice).then(pl.lit("choosen_section"))
+            .when(pl.col('section').is_in(adjacing_sections_filtered)).then(pl.lit('adjacing_section'))
+            .otherwise(pl.lit('other_section'))
+            .alias('section_type')
+        )
+    )
+    df_all = pl.concat([
+        df_filtered.with_columns(pl.lit('other_section').alias('section_type')),
+        df_filtered.filter(pl.col('section_type').is_in(["choosen_section", "adjacing_section"]))
+    ])
+
+    stats = (
+        df_all
+        .group_by('section_type')
+        .agg(
+            mean_price_m2 = pl.median('prix_m2').round(0).cast(int),
+            median_price_m2 = pl.mean('prix_m2').round(0).cast(int),
+            len = pl.len()
+        )
+    )
+
+    return (
+        stats
+        .drop('len')
+        .unpivot(
+            index = ["section_type"],
+            variable_name='price_type',
+            value_name="price"
+        )
+        .sort('section_type', "price_type")
+    )
+
+stats_section = map_calculate_stats_sections(df, year_range, surface_selection, section_choice)
+#st.dataframe(stats_section)
+
+import plotly.express as px
+fig = px.bar(stats_section, 
+             x='price_type', 
+             y='price',
+             color='section_type',
+             barmode='group',
+             text='price',
+             title='Mean and Median Prices by Section Type')
+fig.update_traces(textposition='outside', 
+                  texttemplate='<b>€%{text}</b>')
+st.plotly_chart(fig)
+
 
 #TODO
-#Carte avec les sections
-# prix par section si selectbox
-# années, type de surface, métrique, 
-# select section cadastre, all sections and adjacency by default
-
-# if selection, evolution of the section compared to the neighborood, compared to nice average by lenght of surface 
+#map sur la droite avec la selection
+# courbes de tendance
