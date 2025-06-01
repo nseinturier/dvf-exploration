@@ -17,10 +17,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def centered_subheader(text):
-    st.markdown(f"<h3 style='text-align: center;'>{text}</h3>", unsafe_allow_html=True)
-
-
 df = load_data()
 polygon_data = load_cadastre_data()
 adjacing_sections = load_json(config.data_dir / "cadastre" / "adjency_cadastre.json")
@@ -73,15 +69,15 @@ col1, col2 = st.columns(2)
 # Left column content
 with col1:
     metric_left = "prix_moyen_m2"
-    centered_subheader("Prix moyen au m2")
-    fig_left = plot_evolution(section_stats, metric_left)
+    centered_subheader("Prix moyen au m2") 
+    fig_left = plot_evolution(section_stats, metric_left, "surface_category")
     st.plotly_chart(fig_left)
     
 # Right column content
 with col2:
     metric_right = "prix_median_m2"
     centered_subheader("Prix médian au m2")
-    fig_right = plot_evolution(section_stats, metric_right)
+    fig_right = plot_evolution(section_stats, metric_right, "surface_category")
     st.plotly_chart(fig_right)
 
 st.subheader("Détail des transactions")

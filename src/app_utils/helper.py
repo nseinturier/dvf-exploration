@@ -11,6 +11,9 @@ METRIC_MAPPER = {
         "Prix médian": lambda x: pl.median(x)
     }
 
+def centered_subheader(text):
+    st.markdown(f"<h3 style='text-align: center;'>{text}</h3>", unsafe_allow_html=True)
+
 @st.cache_data
 def load_data():
     return pl.read_csv(config.data_dir / "cleaned" / "data_nice_cleaned.csv", try_parse_dates=True)
@@ -55,13 +58,14 @@ def calculate_stats(
 
 def plot_evolution(
         stats: pl.DataFrame,
-        metric: str
+        metric: str,
+        color_col: str
 )->go.Figure:
     fig = px.line(
         stats,
         x="year", 
         y=metric, 
-        color="surface_category",
+        color=color_col,
         hover_data = {
                 "nb_transactions": ":.0f", 
                 metric: ":.0f",
@@ -230,4 +234,97 @@ def plot_map(
     )
     return fig
 
+def map_calculate_stats_sections(
+        df: pl.DataFrame,
+        adjacing_sections: dict[str, list],
+        year_range: list[int],
+        surface_selection: list[str],
+        section_choice: list[str],
+)->pl.DataFrame:
+    adjacing_sections_filtered = [c for c in adjacing_sections[section_choice] if c != section_choice]
+    df_filtered = (
+        df
+        .filter(
+            pl.col("surface_category").is_in(surface_selection),
+            pl.col('year').is_between(year_range[0], year_range[1]),
+            pl.col('prix_m2') > 500 # remove absurd prices
+        )
+        .with_columns(
+            pl
+            .when(pl.col('section') == section_choice).then(pl.lit("choosen_section"))
+            .when(pl.col('section').is_in(adjacing_sections_filtered)).then(pl.lit('adjacing_section'))
+            .otherwise(pl.lit('other_section'))
+            .alias('section_type')
+        )
+    )
+    df_all = pl.concat([
+        df_filtered.with_columns(pl.lit('other_section').alias('section_type')),
+        df_filtered.filter(pl.col('section_type').is_in(["choosen_section", "adjacing_section"]))
+    ])
 
+    stats = (
+        df_all
+        .group_by('section_type')
+        .agg(
+            mean_price_m2 = pl.median('prix_m2').round(0).cast(int),
+            median_price_m2 = pl.mean('prix_m2').round(0).cast(int),
+            len = pl.len()
+        )
+    )
+
+    return (
+        stats
+        .drop('len')
+        .unpivot(
+            index = ["section_type"],
+            variable_name='price_type',
+            value_name="price"
+        )
+        .sort('section_type', "price_type")
+    )
+
+def map_calculate_evolution(
+        df: pl.DataFrame,
+        section_choice: str,
+        adjacing_sections: dict[str, list],
+        surface_selection: list[str]
+)->pl.DataFrame:
+        adjacing_sections_filtered = [c for c in adjacing_sections[section_choice] if c != section_choice]
+
+        df_filtered = (
+                df
+                .filter(
+                        pl.col("surface_category").is_in(surface_selection),
+                        pl.col('prix_m2') > 500 # remove absurd prices
+                )
+                .with_columns(
+                        pl
+                        .when(pl.col('section') == section_choice).then(pl.lit("choosen_section"))
+                        .when(pl.col('section').is_in(adjacing_sections_filtered)).then(pl.lit('adjacing_section'))
+                        .otherwise(pl.lit('other_section'))
+                        .alias('section_type')
+                        )
+        )
+
+        evolution_sections = pl.concat([
+                df_filtered.with_columns(pl.lit('other_section').alias('section_type')),
+                df_filtered.filter(pl.col('section_type').is_in(["choosen_section", "adjacing_section"]))
+        ])
+
+        evolution_sections = (
+                evolution_sections
+                .group_by("year", 'section_type')
+                .agg(
+                mean_price_m2 = pl.median('prix_m2').round(0).cast(int),
+                median_price_m2 = pl.mean('prix_m2').round(0).cast(int),
+                nb_transactions = pl.len()
+                )
+                .sort('section_type', 'year')
+                .with_columns([
+                pl.col(col).pct_change().over('section_type').alias(f"{col}_pct_change").fill_null(0)
+                for col in ["mean_price_m2", "median_price_m2"]
+                ])
+                .sort('section_type', 'year')
+        )
+
+        return evolution_sections

@@ -94,58 +94,9 @@ with col2:
     )
     st.plotly_chart(fig)
 
-def map_calculate_stats_sections(
-        df: pl.DataFrame,
-        year_range: list[int],
-        surface_selection: list[str],
-        section_choice: list[str],
-)->pl.DataFrame:
-    adjacing_sections_filtered = [c for c in adjacing_sections[section_choice] if c != section_choice]
-    df_filtered = (
-        df
-        .filter(
-            pl.col("surface_category").is_in(surface_selection),
-            pl.col('year').is_between(year_range[0], year_range[1]),
-            pl.col('prix_m2') > 500 # remove absurd prices
-        )
-        .with_columns(
-            pl
-            .when(pl.col('section') == section_choice).then(pl.lit("choosen_section"))
-            .when(pl.col('section').is_in(adjacing_sections_filtered)).then(pl.lit('adjacing_section'))
-            .otherwise(pl.lit('other_section'))
-            .alias('section_type')
-        )
-    )
-    df_all = pl.concat([
-        df_filtered.with_columns(pl.lit('other_section').alias('section_type')),
-        df_filtered.filter(pl.col('section_type').is_in(["choosen_section", "adjacing_section"]))
-    ])
-
-    stats = (
-        df_all
-        .group_by('section_type')
-        .agg(
-            mean_price_m2 = pl.median('prix_m2').round(0).cast(int),
-            median_price_m2 = pl.mean('prix_m2').round(0).cast(int),
-            len = pl.len()
-        )
-    )
-
-    return (
-        stats
-        .drop('len')
-        .unpivot(
-            index = ["section_type"],
-            variable_name='price_type',
-            value_name="price"
-        )
-        .sort('section_type', "price_type")
-    )
-
-stats_section = map_calculate_stats_sections(df, year_range, surface_selection, section_choice)
+stats_section = map_calculate_stats_sections(df, adjacing_sections,year_range, surface_selection, section_choice)
 #st.dataframe(stats_section)
 
-import plotly.express as px
 fig = px.bar(stats_section, 
              x='price_type', 
              y='price',
@@ -157,6 +108,20 @@ fig.update_traces(textposition='outside',
                   texttemplate='<b>€%{text}</b>')
 st.plotly_chart(fig)
 
+evolution_sections = map_calculate_evolution(df, section_choice, adjacing_sections, surface_selection)
+col1, col2 = st.columns(2)
+with col1:
+    metric_left = "mean_price_m2"
+    centered_subheader("Prix moyen au m2") 
+    fig_left = plot_evolution(evolution_sections, metric_left, "section_type")
+    st.plotly_chart(fig_left)
+    
+# Right column content
+with col2:
+    metric_right = "median_price_m2"
+    centered_subheader("Prix médian au m2")
+    fig_right = plot_evolution(evolution_sections, metric_right, "section_type")
+    st.plotly_chart(fig_right)
 
 #TODO
 #map sur la droite avec la selection
