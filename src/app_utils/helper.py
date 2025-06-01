@@ -154,7 +154,7 @@ def plot_map(
         
         # Normalize price to 0-1 scale for color mapping
         price = housing_metric[name]
-        normalized_price = (price - min_price) / (max_price - min_price)
+        normalized_price = (price - min_price) / (max_price - min_price) if (max_price - min_price) != 0 else 2
         
         # Create color (using Viridis colorscale)
         color = px.colors.sample_colorscale(color_choice, normalized_price)[0]
@@ -218,24 +218,14 @@ def plot_map(
         map=dict(
             style="carto-positron",
             center=dict(lat=lat, lon=lon),
-            zoom=11
+            zoom=zoom,
+            bearing=0,
+            pitch=0
         ),
         showlegend=False,  # Clean - no messy legend
         height=height,
         width=width,
         margin=dict(l=0, r=0, t=0, b=0),  # Space for colorbar
-    )
-
-    # Enable all map controls
-    fig.update_layout(
-        map=dict(
-            style="carto-positron",
-            center=dict(lat=lat, lon=lon),
-            zoom=zoom,
-            bearing=0,
-            pitch=0
-        ),
-        # Enable zoom, pan, select, etc.
         dragmode='pan'
     )
     return fig

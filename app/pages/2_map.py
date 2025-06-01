@@ -66,7 +66,7 @@ polygon_data = {k: v for k, v in polygon_data.items() if k in housing_prices.key
 
 
 
-map = plot_map(housing_prices, polygon_data)
+map = plot_map(housing_prices, polygon_data, display_section_name=True)
 st.plotly_chart(map)
 
 ################################ PART 2 #######################################
@@ -89,7 +89,7 @@ with col2:
         height=200,
         width=300,
         display_section_name=True,
-        zoom=11.5,
+        zoom=11.8,
         show_colorbar=False
     )
     st.plotly_chart(fig)

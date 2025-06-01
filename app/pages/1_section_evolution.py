@@ -22,6 +22,7 @@ def centered_subheader(text):
 
 
 df = load_data()
+polygon_data = load_cadastre_data()
 adjacing_sections = load_json(config.data_dir / "cadastre" / "adjency_cadastre.json")
 sections = df.get_column('section').unique().sort().to_list()
 
@@ -40,12 +41,33 @@ with col3:
     st.write("&nbsp;", unsafe_allow_html=True) #blank space to align sections
     include_adjacency = st.checkbox("Inclure les sections cadastres adjacentes")
 
-section_choice = st.selectbox('Choose a section:', sections, index=sections.index('LC')) 
-section_choice = adjacing_sections[section_choice] if include_adjacency else [section_choice]
+col1, col2 = st.columns(2)
+with col1:
+    choosen_section = st.selectbox('Choose a section:', sections, index=sections.index('LC')) 
+    section_choice = adjacing_sections[choosen_section] if include_adjacency else [choosen_section]
+
+with col2:
+    adjencing_polygons = {k: v for k,v in polygon_data.items() if k in section_choice}
+    housing_metric = {c: 1 if c != choosen_section else 2 for c in section_choice}
+    centroid = adjencing_polygons[choosen_section].centroid
+    lat = centroid.y
+    lon = centroid.x
+    fig = plot_map(
+        housing_metric, 
+        adjencing_polygons,
+        lon = lon,
+        lat = lat,
+        height=200,
+        width=300,
+        display_section_name=True,
+        zoom=11.8,
+        show_colorbar=False
+    )
+    st.plotly_chart(fig)
 
 filtered_df = df.pipe(filter_data, housing_type, section_choice)
 section_stats = filtered_df.pipe(calculate_stats)
-
+st.markdown("<br><br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 
 # Left column content
